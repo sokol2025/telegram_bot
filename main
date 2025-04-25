@@ -1,0 +1,40 @@
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ConversationHandler, filters
+)
+from handlers import (
+    start, choose_role, advertiser_brand, advertiser_niche,
+    advertiser_budget, advertiser_audience, save_blogger, cancel
+)
+
+import os
+
+TOKEN = '8085879338:AAHiW4fMyFffYE4hqY9rTTnRH2lQKmauMd8'  # или можно использовать .env для скрытия токена
+
+# Состояния
+CHOOSING, ADVERTISER_BRAND, ADVERTISER_NICHE, ADVERTISER_BUDGET, ADVERTISER_AUDIENCE, BLOGGER = range(6)
+
+# Настройка бота
+app = ApplicationBuilder().token(TOKEN).build()
+
+# Определение обработчиков
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("start", start)],
+    states={
+        CHOOSING: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_role)],
+        ADVERTISER_BRAND: [MessageHandler(filters.TEXT & ~filters.COMMAND, advertiser_brand)],
+        ADVERTISER_NICHE: [MessageHandler(filters.TEXT & ~filters.COMMAND, advertiser_niche)],
+        ADVERTISER_BUDGET: [MessageHandler(filters.TEXT & ~filters.COMMAND, advertiser_budget)],
+        ADVERTISER_AUDIENCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, advertiser_audience)],
+        BLOGGER: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_blogger)],
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],
+)
+
+# Добавляем обработчики
+app.add_handler(conv_handler)
+
+# Запуск бота
+if __name__ == "__main__":
+    print("✅ Бот запущен. Жди сообщений в Telegram...")
+    app.run_polling()

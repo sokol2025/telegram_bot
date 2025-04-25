@@ -1,0 +1,34 @@
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+def authenticate_google_sheets():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        r"C:\Telegram bot\telegram-bot-457614-0096237ea079.json", scope
+    )
+    client = gspread.authorize(creds)
+    return client
+
+def ensure_sheet_exists(sheet_name):
+    client = authenticate_google_sheets()
+    spreadsheet = client.open("Заявки Telegram")
+
+    try:
+        spreadsheet.worksheet(sheet_name)
+    except gspread.exceptions.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet(title=sheet_name, rows="100", cols="20")
+        if sheet_name == "Рекламодатели":
+            sheet.append_row(["Тип", "Имя", "Username", "Бренд", "Ниша", "Бюджет", "ЦА", "Время"])
+        elif sheet_name == "Блогеры":
+            sheet.append_row(["Тип", "Имя", "Username", "Имя (анкеты)", "Ссылка", "Тематика", "Охват", "Цена", "Время"])
+
+def add_to_google_sheet(data, sheet_name="Рекламодатели"):
+    ensure_sheet_exists(sheet_name)
+    client = authenticate_google_sheets()
+    sheet = client.open("Заявки Telegram").worksheet(sheet_name)
+    sheet.append_row(data)

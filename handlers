@@ -1,0 +1,113 @@
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ContextTypes, ConversationHandler
+from datetime import datetime
+from sheets import add_to_google_sheet
+
+CHOOSING, ADVERTISER_BRAND, ADVERTISER_NICHE, ADVERTISER_BUDGET, ADVERTISER_AUDIENCE = range(5)
+BLOGGER = 5
+
+ADMIN_CHAT_ID = 235130655  # Замени на свой
+
+# === Команда /start ===
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [["🔸 Я рекламодатель", "🔹 Я блогер"]]
+    markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    await update.message.reply_text("👋 Привет! Кто ты?", reply_markup=markup)
+    return CHOOSING
+
+# === Выбор роли ===
+async def choose_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    role = update.message.text
+    if "рекламодатель" in role:
+        await update.message.reply_text("1️⃣ Название бренда:")
+        return ADVERTISER_BRAND
+    elif "блогер" in role:
+        await update.message.reply_text("Заполни анкету (каждое с новой строки):\n\n1. Имя\n2. Ссылка на блог\n3. Тематика\n4. Охват\n5. Цена за рекламу")
+        return BLOGGER
+
+# === Рекламодатель: по шагам ===
+async def advertiser_brand(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["brand"] = update.message.text
+    await update.message.reply_text("2️⃣ Ниша:")
+    return ADVERTISER_NICHE
+
+async def advertiser_niche(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["niche"] = update.message.text
+    await update.message.reply_text("3️⃣ Бюджет:")
+    return ADVERTISER_BUDGET
+
+async def advertiser_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["budget"] = update.message.text
+    await update.message.reply_text("4️⃣ Целевая аудитория:")
+    return ADVERTISER_AUDIENCE
+
+async def advertiser_audience(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["audience"] = update.message.text
+    user = update.message.from_user
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    data = [
+        "Рекламодатель",
+        user.first_name,
+        f"@{user.username}",
+        context.user_data["brand"],
+        context.user_data["niche"],
+        context.user_data["budget"],
+        context.user_data["audience"],
+        timestamp
+    ]
+    add_to_google_sheet(data, sheet_name="Рекламодатели")
+
+    info = (
+        f"\n=== Заявка от рекламодателя ===\n"
+        f"Имя: {user.first_name} @{user.username}\n"
+        f"Бренд: {context.user_data['brand']}\n"
+        f"Ниша: {context.user_data['niche']}\n"
+        f"Бюджет: {context.user_data['budget']}\n"
+        f"ЦА: {context.user_data['audience']}\n"
+    )
+
+    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"📩 Новая заявка от рекламодателя:\n{info}")
+    await update.message.reply_text("Спасибо! Мы свяжемся с вами скоро. 🙌")
+
+    return ConversationHandler.END
+
+# === Блогер: анкета в 1 сообщении ===
+async def save_blogger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    user = update.message.from_user
+    fields = text.split("\n")
+
+    # Безопасность: чтобы не упало, если полей меньше
+    while len(fields) < 5:
+        fields.append("-")
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    data = [
+        "Блогер",
+        user.first_name,
+        f"@{user.username}",
+        fields[0],  # Имя
+        fields[1],  # Ссылка
+        fields[2],  # Тематика
+        fields[3],  # Охват
+        fields[4],  # Цена
+        timestamp
+    ]
+    add_to_google_sheet(data, sheet_name="Блогеры")
+
+    info = (
+        f"\n=== Анкета блогера ===\n"
+        f"Имя: {user.first_name} @{user.username}\n"
+        f"{text}\n"
+    )
+    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"📩 Новая анкета блогера:\n{info}")
+    await update.message.reply_text("Анкета получена! Мы добавим вас в базу ✅")
+
+    return ConversationHandler.END
+
+# === Отмена ===
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Окей, отменили 😌")
+    return ConversationHandler.END
